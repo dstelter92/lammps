@@ -541,6 +541,8 @@
 /fix_spring_pull.h
 /fix_srd.cpp
 /fix_srd.h
+/fix_stmd.cpp
+/fix_stmd.h
 /fix_temp_rescale_eff.cpp
 /fix_temp_rescale_eff.h
 /fix_thermal_conductivity.cpp
@@ -963,6 +965,8 @@
 /temper_grem.h
 /temper_npt.cpp
 /temper_npt.h
+/temper_stmd.cpp
+/temper_stmd.h
 /thr_data.cpp
 /thr_data.h
 /verlet_split.cpp
