@@ -70,6 +70,7 @@ void NPairSSAKokkos<DeviceType>::copy_neighbor_info()
   k_ex2_bit = neighborKK->k_ex2_bit;
   k_ex_mol_group = neighborKK->k_ex_mol_group;
   k_ex_mol_bit = neighborKK->k_ex_mol_bit;
+  k_ex_mol_intra = neighborKK->k_ex_mol_intra;
 }
 
 /* ----------------------------------------------------------------------
@@ -143,7 +144,7 @@ void NPairSSAKokkos<DeviceType>::copy_stencil_info()
 
   // Setup the phases of the workplan for locals
   ssa_phaseCt = sz1*sy1*sx1;
-  if (ssa_phaseCt > (int) k_ssa_phaseLen.dimension_0()) {
+  if (ssa_phaseCt > (int) k_ssa_phaseLen.extent(0)) {
     k_ssa_phaseLen = DAT::tdual_int_1d("NPairSSAKokkos:ssa_phaseLen",ssa_phaseCt);
     ssa_phaseLen = k_ssa_phaseLen.view<DeviceType>();
     k_ssa_phaseOff = DAT::tdual_int_1d_3("NPairSSAKokkos:ssa_phaseOff",ssa_phaseCt);
@@ -217,8 +218,12 @@ int NPairSSAKokkosExecute<DeviceType>::exclusion(const int &i,const int &j,
 
   if (nex_mol) {
     for (m = 0; m < nex_mol; m++)
-      if (mask(i) & ex_mol_bit(m) && mask(j) & ex_mol_bit(m) &&
-          molecule(i) == molecule(j)) return 1;
+      if (ex_mol_intra[m]) { // intra-chain: exclude i-j pair if on same molecule
+        if (mask[i] & ex_mol_bit[m] && mask[j] & ex_mol_bit[m] &&
+            molecule[i] == molecule[j]) return 1;
+      } else                 // exclude i-j pair if on different molecules
+        if (mask[i] & ex_mol_bit[m] && mask[j] & ex_mol_bit[m] &&
+            molecule[i] != molecule[j]) return 1;
   }
 
   return 0;
@@ -246,8 +251,8 @@ void NPairSSAKokkos<DeviceType>::build(NeighList *list_)
   int zbinCt = (lbinzhi - lbinzlo + sz1 - 1) / sz1 + 1;
   int phaseLenEstimate = xbinCt*ybinCt*zbinCt;
 
-  if ((ssa_phaseCt > (int) k_ssa_itemLoc.dimension_0()) ||
-      (phaseLenEstimate > (int) k_ssa_itemLoc.dimension_1())) {
+  if ((ssa_phaseCt > (int) k_ssa_itemLoc.extent(0)) ||
+      (phaseLenEstimate > (int) k_ssa_itemLoc.extent(1))) {
     k_ssa_itemLoc = DAT::tdual_int_2d("NPairSSAKokkos::ssa_itemLoc",ssa_phaseCt,phaseLenEstimate);
     ssa_itemLoc = k_ssa_itemLoc.view<DeviceType>();
     k_ssa_itemLen = DAT::tdual_int_2d("NPairSSAKokkos::ssa_itemLen",ssa_phaseCt,phaseLenEstimate);
@@ -418,6 +423,7 @@ fprintf(stdout, "tota%03d total %3d could use %6d inums, expected %6d inums. inu
          nex_mol,
          k_ex_mol_group.view<DeviceType>(),
          k_ex_mol_bit.view<DeviceType>(),
+         k_ex_mol_intra.view<DeviceType>(),
          bboxhi,bboxlo,
          domain->xperiodic,domain->yperiodic,domain->zperiodic,
          domain->xprd_half,domain->yprd_half,domain->zprd_half);
@@ -432,6 +438,7 @@ fprintf(stdout, "tota%03d total %3d could use %6d inums, expected %6d inums. inu
   k_ex2_bit.sync<DeviceType>();
   k_ex_mol_group.sync<DeviceType>();
   k_ex_mol_bit.sync<DeviceType>();
+  k_ex_mol_intra.sync<DeviceType>();
   k_bincount.sync<DeviceType>();
   k_bins.sync<DeviceType>();
   k_gbincount.sync<DeviceType>();
@@ -485,7 +492,7 @@ fprintf(stdout, "tota%03d total %3d could use %6d inums, expected %6d inums. inu
     if(data.h_resize()) {
       deep_copy(data.h_new_maxneighs, data.new_maxneighs);
       list->maxneighs = data.h_new_maxneighs() * 1.2;
-      list->d_neighbors = typename ArrayTypes<DeviceType>::t_neighbors_2d("neighbors", list->d_neighbors.dimension_0(), list->maxneighs);
+      list->d_neighbors = typename ArrayTypes<DeviceType>::t_neighbors_2d("neighbors", list->d_neighbors.extent(0), list->maxneighs);
       data.neigh_list.d_neighbors = list->d_neighbors;
       data.neigh_list.maxneighs = list->maxneighs;
     }
@@ -643,7 +650,7 @@ fprintf(stdout, "Phas%03d phase %3d used %6d inums, workItems = %3d, skipped = %
     // record where workPhase actually ends
     if (firstTry) {
       d_ssa_phaseLen(workPhase) = workItem;
-      while (workItem < (int) d_ssa_itemLen.dimension_1()) {
+      while (workItem < (int) d_ssa_itemLen.extent(1)) {
         d_ssa_itemLen(workPhase,workItem++) = 0;
       }
     }
