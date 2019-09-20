@@ -20,6 +20,10 @@ style = {none} or {ewald} or {ewald/disp} or {ewald/omp} or {pppm} or {pppm/cg} 
     accuracy = desired relative error in forces
   {ewald/omp} value = accuracy
     accuracy = desired relative error in forces
+  {ewald/dipole} value = accuracy
+    accuracy = desired relative error in forces
+  {ewald/dipole/spin} value = accuracy
+    accuracy = desired relative error in forces
   {pppm} value = accuracy
     accuracy = desired relative error in forces
   {pppm/cg} values = accuracy (smallq)
@@ -47,6 +51,10 @@ style = {none} or {ewald} or {ewald/disp} or {ewald/omp} or {pppm} or {pppm/cg} 
     accuracy = desired relative error in forces
   {pppm/stagger} value = accuracy
     accuracy = desired relative error in forces
+  {pppm/dipole} value = accuracy
+    accuracy = desired relative error in forces
+  {pppm/dipole/spin} value = accuracy
+    accuracy = desired relative error in forces
   {msm} value = accuracy
     accuracy = desired relative error in forces
   {msm/cg} value = accuracy (smallq)
@@ -58,7 +66,7 @@ style = {none} or {ewald} or {ewald/disp} or {ewald/omp} or {pppm} or {pppm/cg} 
     accuracy = desired relative error in forces
     smallq = cutoff for charges to be considered (optional) (charge units)
   {scafacos} values = method accuracy
-    method = fmm or p2nfft or ewald or direct 
+    method = fmm or p2nfft or p3m or ewald or direct
     accuracy = desired relative error in forces :pre
 :ule
 
@@ -105,9 +113,15 @@ The {ewald/disp} style adds a long-range dispersion sum option for
 but in a more efficient manner than the {ewald} style.  The 1/r^6
 capability means that Lennard-Jones or Buckingham potentials can be
 used without a cutoff, i.e. they become full long-range potentials.
-The {ewald/disp} style can also be used with point-dipoles
-"(Toukmaji)"_#Toukmaji and is currently the only kspace solver in
-LAMMPS with this capability.
+The {ewald/disp} style can also be used with point-dipoles, see
+"(Toukmaji)"_#Toukmaji.
+
+The {ewald/dipole} style adds long-range standard Ewald summations
+for dipole-dipole interactions, see "(Toukmaji)"_#Toukmaji.
+
+The {ewald/dipole/spin} style adds long-range standard Ewald
+summations for magnetic dipole-dipole interactions between
+magnetic spins.
 
 :line
 
@@ -127,6 +141,12 @@ Similarly the {msm/cg} style implements the same optimization for {msm}.
 The optional {smallq} argument defines the cutoff for the absolute
 charge value which determines whether a particle is considered charged
 or not.  Its default value is 1.0e-5.
+
+The {pppm/dipole} style invokes a particle-particle particle-mesh solver
+for dipole-dipole interactions, following the method of "(Cerda)"_#Cerda2008.
+
+The {pppm/dipole/spin} style invokes a particle-particle particle-mesh solver
+for magnetic dipole-dipole interactions between magnetic spins.
 
 The {pppm/tip4p} style is identical to the {pppm} style except that it
 adds a charge at the massless 4th site in each TIP4P water molecule.
@@ -193,7 +213,7 @@ the -DFFT_SINGLE compiler switch.
 The {msm} style invokes a multi-level summation method MSM solver,
 "(Hardy)"_#Hardy2006 or "(Hardy2)"_#Hardy2009, which maps atom charge
 to a 3d mesh, and uses a multi-level hierarchy of coarser and coarser
-meshes on which direct coulomb solves are done.  This method does not
+meshes on which direct Coulomb solvers are done.  This method does not
 use FFTs and scales as N. It may therefore be faster than the other
 K-space solvers for relatively large problems when running on large
 core counts. MSM can also be used for non-periodic boundary conditions
@@ -201,7 +221,7 @@ and for mixed periodic and non-periodic boundaries.
 
 MSM is most competitive versus Ewald and PPPM when only relatively
 low accuracy forces, about 1e-4 relative error or less accurate,
-are needed. Note that use of a larger coulomb cutoff (i.e. 15
+are needed. Note that use of a larger Coulombic cutoff (i.e. 15
 angstroms instead of 10 angstroms) provides better MSM accuracy for
 both the real space and grid computed forces.
 
@@ -237,7 +257,7 @@ See details on "this page"_Section_packages.html#USER-SCAFACOS.
 
 NOTE: Unlike other KSpace solvers in LAMMPS, ScaFaCoS computes all
 Coulombic interactions, both short- and long-range.  Thus you should
-NOT use a Coulmbic pair style when using kspace_style scafacos.  This
+NOT use a Coulombic pair style when using kspace_style scafacos.  This
 also means the total Coulombic energy (short- and long-range) will be
 tallied for "thermodynamic output"_thermo_style.html command as part
 of the {elong} keyword; the {ecoul} keyword will be zero.
@@ -317,7 +337,10 @@ using ideas from chapter 3 of "(Hardy)"_#Hardy2006, with equation 3.197
 of particular note. When using {msm} with non-periodic boundary
 conditions, it is expected that the error estimation will be too
 pessimistic. RMS force errors for dipoles when using {ewald/disp}
-are estimated using equations 33 and 46 of "(Wang)"_#Wang.
+or {ewald/dipole} are estimated using equations 33 and 46 of
+"(Wang)"_#Wang. The RMS force errors for {pppm/dipole} are estimated
+using the equations in "(Cerda)"_#Cerda2008.
+
 
 See the "kspace_modify"_kspace_modify.html command for additional
 options of the K-space solvers that can be set, including a {force}
@@ -370,8 +393,7 @@ of these styles.
 
 All of the kspace styles are part of the KSPACE package.  They are
 only enabled if LAMMPS was built with that package.  See the "Build
-package"_Build_package.html doc page for more info.  Note that the
-KSPACE package is installed by default.
+package"_Build_package.html doc page for more info.
 
 For MSM, a simulation must be 3d and one can use any combination of
 periodic, non-periodic, or shrink-wrapped boundaries (specified using
@@ -392,6 +414,8 @@ the same bond/angle/dihedral are weighted by the
 "special_bonds"_special_bonds.html command.  Likewise it does not
 support the "TIP4P water style" where a fictitious charge site is
 introduced in each water molecule.
+Finally, the methods {p3m} and {ewald} do not support computing the
+virial, so this contribution is not included.
 
 [Related commands:]
 
@@ -462,6 +486,9 @@ Illinois at Urbana-Champaign, (2006).
 
 :link(Sutmann2013)
 [(Sutmann)] Sutmann, Arnold, Fahrenberger, et. al., Physical review / E 88(6), 063308 (2013)
+
+:link(Cerda2008)
+[(Cerda)] Cerda, Ballenegger, Lenz, Holm, J Chem Phys 129, 234104 (2008)
 
 :link(Who2012)
 [(Who)] Who, Author2, Author3, J of Long Range Solvers, 35, 164-177

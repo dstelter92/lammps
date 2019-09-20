@@ -47,7 +47,7 @@ the based classes of LAMMPS.
 The pairwise contributions are computing via a callback that the
 compute registers with the non-bonded pairwise force computation.
 This limits the use to systems that have no bonds, no Kspace, and no
-manybody interactions. On the other hand, the computation does not
+many-body interactions. On the other hand, the computation does not
 have to compute forces or energies a second time and thus can be much
 more efficient. The callback mechanism allows to write more complex
 pairwise property computations.
@@ -87,6 +87,8 @@ such as "Tersoff"_pair_tersoff.html and
 potentials only include the pair potential portion of the EAM
 interaction when used by this compute, not the embedding term.  Also
 bonded or Kspace interactions do not contribute to this compute.
+
+The computes in this package are not compatible with dynamic groups.
 
 [Related commands:]
 

@@ -18,10 +18,13 @@
 #ifndef LMP_THR_OMP_H
 #define LMP_THR_OMP_H
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 #include "pointers.h"
 #include "error.h"
-#include "fix_omp.h"
-#include "thr_data.h"
+#include "fix_omp.h"  // IWYU pragma: export
+#include "thr_data.h" // IWYU pragma: export
 
 namespace LAMMPS_NS {
 
@@ -31,8 +34,6 @@ class Bond;
 class Angle;
 class Dihedral;
 class Improper;
-class KSpace;
-class Fix;
 
 class ThrOMP {
 
@@ -185,6 +186,7 @@ static inline void loop_setup_thr(int &ifrom, int &ito, int &tid,
   tid = 0;
   ifrom = 0;
   ito = inum;
+  nthreads = 1;
 #endif
 }
 

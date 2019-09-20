@@ -33,6 +33,8 @@
 #include "compute.h"
 #include "modify.h"
 #include "pair.h"
+#include "utils.h"
+#include "timer.h"
 
 #include "plumed/wrapper/Plumed.h"
 
@@ -105,7 +107,11 @@ FixPlumed::FixPlumed(LAMMPS *lmp, int narg, char **arg) :
   // whereas if partitions are not defined then world is equal to
   // MPI_COMM_WORLD.
 
+#if !defined(MPI_STUBS)
+  // plumed does not know about LAMMPS using the MPI STUBS library and will
+  // fail if this is called under these circumstances
   p->cmd("setMPIComm",&world);
+#endif
 
   // Set up units
   // LAMMPS units wrt kj/mol - nm - ps
@@ -213,8 +219,8 @@ FixPlumed::FixPlumed(LAMMPS *lmp, int narg, char **arg) :
 
   // Define compute to calculate potential energy
 
-  id_pe = new char[7];
-  id_pe = (char *) "plmd_pe";
+  id_pe = new char[8];
+  strcpy(id_pe,"plmd_pe");
   char **newarg = new char*[3];
   newarg[0] = id_pe;
   newarg[1] = (char *) "all";
@@ -224,9 +230,10 @@ FixPlumed::FixPlumed(LAMMPS *lmp, int narg, char **arg) :
   int ipe = modify->find_compute(id_pe);
   c_pe = modify->compute[ipe];
 
-// Define compute to calculate pressure tensor
-  id_press = new char[9];
-  id_press = (char *) "plmd_press";
+  // Define compute to calculate pressure tensor
+
+  id_press = new char[11];
+  strcpy(id_press,"plmd_press");
   newarg = new char*[5];
   newarg[0] = id_press;
   newarg[1] = (char *) "all";
@@ -249,15 +256,15 @@ FixPlumed::FixPlumed(LAMMPS *lmp, int narg, char **arg) :
     // Avoid conflict with fixes that define internal pressure computes.
     // See comment in the setup method
 
-    if ((strncmp(check_style,"nph",3) == 0) ||
-        (strncmp(check_style,"npt",3) == 0) ||
-        (strncmp(check_style,"rigid/nph",9) == 0) ||
-        (strncmp(check_style,"rigid/npt",9) == 0) ||
-        (strncmp(check_style,"msst",4) == 0) ||
-        (strncmp(check_style,"nphug",5) == 0) ||
-        (strncmp(check_style,"ipi",3) == 0) ||
-        (strncmp(check_style,"press/berendsen",15) == 0) ||
-        (strncmp(check_style,"qbmsst",6) == 0))
+    if (utils::strmatch(check_style,"^nph") ||
+        utils::strmatch(check_style,"^npt") ||
+        utils::strmatch(check_style,"^rigid/nph") ||
+        utils::strmatch(check_style,"^rigid/npt") ||
+        utils::strmatch(check_style,"^msst") ||
+        utils::strmatch(check_style,"^nphug") ||
+        utils::strmatch(check_style,"^ipi") ||
+        utils::strmatch(check_style,"^press/berendsen") ||
+        utils::strmatch(check_style,"^qbmsst"))
       error->all(FLERR,"Fix plumed must be defined before any other fixes, "
                  "that compute pressure internally");
   }
@@ -268,6 +275,8 @@ FixPlumed::~FixPlumed()
   delete p;
   modify->delete_compute(id_pe);
   modify->delete_compute(id_press);
+  delete[] id_pe;
+  delete[] id_press;
   delete[] masses;
   delete[] charges;
   delete[] gatindex;
@@ -286,7 +295,7 @@ int FixPlumed::setmask()
 
 void FixPlumed::init()
 {
-  if (strcmp(update->integrate_style,"respa") == 0)
+  if (utils::strmatch(update->integrate_style,"^respa"))
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
 
   // This avoids nan pressure if compute_pressure is called
@@ -306,12 +315,12 @@ void FixPlumed::setup(int vflag)
   // has to be executed first. This creates a race condition with the
   // setup method of fix_nh. This is why in the constructor I check if
   // nh fixes have already been called.
-  if (strcmp(update->integrate_style,"verlet") == 0)
-    post_force(vflag);
-  else {
+  if (utils::strmatch(update->integrate_style,"^respa")) {
     ((Respa *) update->integrate)->copy_flevel_f(nlevels_respa-1);
     post_force_respa(vflag,nlevels_respa-1,0);
     ((Respa *) update->integrate)->copy_f_flevel(nlevels_respa-1);
+  } else {
+    post_force(vflag);
   }
 }
 
@@ -402,6 +411,8 @@ void FixPlumed::post_force(int /* vflag */)
 
   // pass all pointers to plumed:
   p->cmd("setStep",&step);
+  int plumedStopCondition=0; 
+  p->cmd("setStopFlag",&plumedStopCondition);
   p->cmd("setPositions",&atom->x[0][0]);
   p->cmd("setBox",&box[0][0]);
   p->cmd("setForces",&atom->f[0][0]);
@@ -410,8 +421,8 @@ void FixPlumed::post_force(int /* vflag */)
   p->cmd("getBias",&bias);
 
   // Pass virial to plumed
-  // If energy is needed virial_plmd is equal to Lammps' virial
-  // If energy is not needed virial_plmd is initialized to zero
+  // If energy is needed plmd_virial is equal to Lammps' virial
+  // If energy is not needed plmd_virial is initialized to zero
   // In the first case the virial will be rescaled and an extra term will be added
   // In the latter case only an extra term will be added
   p->cmd("setVirial",&plmd_virial[0][0]);
@@ -470,25 +481,33 @@ void FixPlumed::post_force(int /* vflag */)
     plmd_virial[0][1]=-virial_lmp[3];
     plmd_virial[0][2]=-virial_lmp[4];
     plmd_virial[1][2]=-virial_lmp[5];
-  } else {
-    virial_lmp = new double[6];
-    for (int i=0;i<6;i++) virial_lmp[i] = 0.;
   }
   // do the real calculation:
   p->cmd("performCalc");
 
+  if(plumedStopCondition) timer->force_timeout();
+
   // retransform virial to lammps representation and assign it to this
-  // fix's virial.  Plumed is giving back the full virial and therefore
-  // we have to subtract the initial virial i.e. virial_lmp.
+  // fix's virial. If the energy is biased, Plumed is giving back the full
+  // virial and therefore we have to subtract the initial virial i.e. virial_lmp.
   // The vector virial contains only the contribution added by plumed.
   // The calculation of the pressure will be done by a compute pressure
   // and will include this contribution.
-  virial[0] = -plmd_virial[0][0]-virial_lmp[0];
-  virial[1] = -plmd_virial[1][1]-virial_lmp[1];
-  virial[2] = -plmd_virial[2][2]-virial_lmp[2];
-  virial[3] = -plmd_virial[0][1]-virial_lmp[3];
-  virial[4] = -plmd_virial[0][2]-virial_lmp[4];
-  virial[5] = -plmd_virial[1][2]-virial_lmp[5];
+  if (plumedNeedsEnergy) {
+    virial[0] = -plmd_virial[0][0]-virial_lmp[0];
+    virial[1] = -plmd_virial[1][1]-virial_lmp[1];
+    virial[2] = -plmd_virial[2][2]-virial_lmp[2];
+    virial[3] = -plmd_virial[0][1]-virial_lmp[3];
+    virial[4] = -plmd_virial[0][2]-virial_lmp[4];
+    virial[5] = -plmd_virial[1][2]-virial_lmp[5];
+  } else {
+    virial[0] = -plmd_virial[0][0];
+    virial[1] = -plmd_virial[1][1];
+    virial[2] = -plmd_virial[2][2];
+    virial[3] = -plmd_virial[0][1];
+    virial[4] = -plmd_virial[0][2];
+    virial[5] = -plmd_virial[1][2];
+  }
 
   // Ask for the computes in the next time step
   // such that the virial and energy are tallied.
@@ -522,7 +541,8 @@ int FixPlumed::modify_param(int narg, char **arg)
 {
   if (strcmp(arg[0],"pe") == 0) {
     if (narg < 2) error->all(FLERR,"Illegal fix_modify command");
-    modify->delete_compute(id_pe); delete [] id_pe;
+    modify->delete_compute(id_pe);
+    delete[] id_pe;
     int n = strlen(arg[1]) + 1;
     id_pe = new char[n];
     strcpy(id_pe,arg[1]);
@@ -540,7 +560,8 @@ int FixPlumed::modify_param(int narg, char **arg)
 
   } else if (strcmp(arg[0],"press") == 0) {
     if (narg < 2) error->all(FLERR,"Illegal fix_modify command");
-    modify->delete_compute(id_press); delete [] id_press;
+    modify->delete_compute(id_press);
+    delete[] id_press;
     int n = strlen(arg[1]) + 1;
     id_press = new char[n];
     strcpy(id_press,arg[1]);

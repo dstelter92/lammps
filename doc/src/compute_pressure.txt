@@ -16,12 +16,13 @@ ID, group-ID are documented in "compute"_compute.html command
 pressure = style name of this compute command
 temp-ID = ID of compute that calculates temperature, can be NULL if not needed
 zero or more keywords may be appended
-keyword = {ke} or {pair} or {bond} or {angle} or {dihedral} or {improper} or {kspace} or {fix} or {virial} :ul
+keyword = {ke} or {pair} or {bond} or {angle} or {dihedral} or {improper} or {kspace} or {fix} or {virial} or {pair/hybrid} :ul
 
 [Examples:]
 
 compute 1 all pressure thermo_temp
-compute 1 all pressure NULL pair bond :pre
+compute 1 all pressure NULL pair bond
+compute 1 all pressure NULL pair/hybrid lj/cut :pre
 
 [Description:]
 
@@ -40,7 +41,7 @@ below), Kb is the Boltzmann constant, T is the temperature, d is the
 dimensionality of the system (2 or 3 for 2d/3d), and V is the system
 volume (or area in 2d).  The second term is the virial, equal to
 -dU/dV, computed for all pairwise as well as 2-body, 3-body, 4-body,
-manybody, and long-range interactions, where r_i and f_i are the
+many-body, and long-range interactions, where r_i and f_i are the
 position and force vector of atom i, and the black dot indicates a dot
 product.  When periodic boundary conditions are used, N' necessarily
 includes periodic image (ghost) atoms outside the central box, and the
@@ -67,8 +68,11 @@ extra keywords are listed, then only those components are summed to
 compute temperature or ke and/or the virial.  The {virial} keyword
 means include all terms except the kinetic energy {ke}.
 
+The {pair/hybrid} keyword means to only include contribution
+from a sub-style in a {hybrid} or {hybrid/overlay} pair style.
+
 Details of how LAMMPS computes the virial efficiently for the entire
-system, including for manybody potentials and accounting for the
+system, including for many-body potentials and accounting for the
 effects of periodic boundary conditions are discussed in
 "(Thompson)"_#Thompson1.
 

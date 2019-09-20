@@ -7,7 +7,7 @@ Documentation"_ld - "LAMMPS Commands"_lc :c
 
 :line
 
-"All commands"_Commands_all.html,
+"General commands"_Commands_all.html,
 "Fix styles"_Commands_fix.html,
 "Compute styles"_Commands_compute.html,
 "Pair styles"_Commands_pair.html,
@@ -61,6 +61,7 @@ OPT.
 "edpd/source"_fix_dpd_source.html,
 "efield"_fix_efield.html,
 "ehex"_fix_ehex.html,
+"electron/stopping"_fix_electron_stopping.html,
 "enforce2d (k)"_fix_enforce2d.html,
 "eos/cv"_fix_eos_cv.html,
 "eos/table"_fix_eos_table.html,
@@ -106,6 +107,7 @@ OPT.
 "mvv/edpd"_fix_mvv_dpd.html,
 "mvv/tdpd"_fix_mvv_dpd.html,
 "neb"_fix_neb.html,
+"neb_spin"_fix_neb_spin.html,
 "nph (ko)"_fix_nh.html,
 "nph/asphere (o)"_fix_nph_asphere.html,
 "nph/body"_fix_nph_body.html,
@@ -169,8 +171,7 @@ OPT.
 "qmmm"_fix_qmmm.html,
 "qtb"_fix_qtb.html,
 "rattle"_fix_shake.html,
-"reax/bonds"_fix_reax_bonds.html,
-"reax/c/bonds (k)"_fix_reax_bonds.html,
+"reax/c/bonds (k)"_fix_reaxc_bonds.html,
 "reax/c/species (k)"_fix_reaxc_species.html,
 "recenter"_fix_recenter.html,
 "restrain"_fix_restrain.html,
@@ -225,14 +226,15 @@ OPT.
 "wall/body/polyhedron"_fix_wall_body_polyhedron.html,
 "wall/colloid"_fix_wall.html,
 "wall/ees"_fix_wall_ees.html,
-"wall/gran (o)"_fix_wall_gran.html,
+"wall/gran"_fix_wall_gran.html,
 "wall/gran/region"_fix_wall_gran_region.html,
 "wall/harmonic"_fix_wall.html,
 "wall/lj1043"_fix_wall.html,
 "wall/lj126"_fix_wall.html,
 "wall/lj93 (k)"_fix_wall.html,
+"wall/morse"_fix_wall.html,
 "wall/piston"_fix_wall_piston.html,
 "wall/reflect (k)"_fix_wall_reflect.html,
 "wall/region"_fix_wall_region.html,
 "wall/region/ees"_fix_wall_ees.html,
-"wall/srd"_fix_wall_srd.html :tb(c=8,ea=c)
+"wall/srd"_fix_wall_srd.html :tb(c=6,ea=c)

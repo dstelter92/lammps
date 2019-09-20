@@ -15,24 +15,18 @@
    Contributing author: Paul Crozier (SNL)
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
-#include <cctype>
-#include <cfloat>
-#include <climits>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "pair.h"
+#include <mpi.h>
+#include <cfloat>    // IWYU pragma: keep
+#include <climits>   // IWYU pragma: keep
+#include <cmath>
+#include <cstring>
 #include "atom.h"
 #include "neighbor.h"
-#include "neigh_list.h"
 #include "domain.h"
 #include "comm.h"
 #include "force.h"
 #include "kspace.h"
-#include "update.h"
-#include "modify.h"
 #include "compute.h"
 #include "suffix.h"
 #include "atom_masks.h"
@@ -60,6 +54,7 @@ Pair::Pair(LAMMPS *lmp) : Pointers(lmp)
   comm_forward = comm_reverse = comm_reverse_off = 0;
 
   single_enable = 1;
+  single_hessian_enable = 0;
   restartinfo = 1;
   respa_enable = 0;
   one_coeff = 0;
@@ -72,7 +67,10 @@ Pair::Pair(LAMMPS *lmp) : Pointers(lmp)
   single_extra = 0;
   svector = NULL;
 
-  ewaldflag = pppmflag = msmflag = dispersionflag = tip4pflag = dipoleflag = 0;
+  setflag = NULL;
+  cutsq = NULL;
+
+  ewaldflag = pppmflag = msmflag = dispersionflag = tip4pflag = dipoleflag = spinflag = 0;
   reinitflag = 1;
 
   // pair_modify settings
@@ -99,6 +97,9 @@ Pair::Pair(LAMMPS *lmp) : Pointers(lmp)
 
   num_tally_compute = 0;
   list_tally_compute = NULL;
+
+  nondefault_history_transfer = 0;
+  beyond_contact = 0;
 
   // KOKKOS per-fix data masks
 
@@ -151,13 +152,13 @@ void Pair::modify_params(int narg, char **arg)
     } else if (strcmp(arg[iarg],"table") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal pair_modify command");
       ncoultablebits = force->inumeric(FLERR,arg[iarg+1]);
-      if (ncoultablebits > sizeof(float)*CHAR_BIT)
+      if (ncoultablebits > (int)sizeof(float)*CHAR_BIT)
         error->all(FLERR,"Too many total bits for bitmapped lookup table");
       iarg += 2;
     } else if (strcmp(arg[iarg],"table/disp") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal pair_modify command");
       ndisptablebits = force->inumeric(FLERR,arg[iarg+1]);
-      if (ndisptablebits > sizeof(float)*CHAR_BIT)
+      if (ndisptablebits > (int)sizeof(float)*CHAR_BIT)
         error->all(FLERR,"Too many total bits for bitmapped lookup table");
       iarg += 2;
     } else if (strcmp(arg[iarg],"tabinner") == 0) {
@@ -180,6 +181,10 @@ void Pair::modify_params(int narg, char **arg)
       else if (strcmp(arg[iarg+1],"no") == 0) compute_flag = 0;
       else error->all(FLERR,"Illegal pair_modify command");
       iarg += 2;
+    } else if (strcmp(arg[iarg],"nofdotr") == 0) {
+      if (iarg+2 > narg) error->all(FLERR,"Illegal pair_modify command");
+      no_virial_fdotr_compute = 1;
+      ++iarg;
     } else error->all(FLERR,"Illegal pair_modify command");
   }
 }
@@ -195,7 +200,7 @@ void Pair::init()
   if (tail_flag && domain->dimension == 2)
     error->all(FLERR,"Cannot use pair tail corrections with 2d simulations");
   if (tail_flag && domain->nonperiodic && comm->me == 0)
-    error->warning(FLERR,"Using pair tail corrections with nonperiodic system");
+    error->warning(FLERR,"Using pair tail corrections with non-periodic system");
   if (!compute_flag && tail_flag && comm->me == 0)
     error->warning(FLERR,"Using pair tail corrections with "
                    "pair_modify compute no");
@@ -688,8 +693,7 @@ double Pair::mix_distance(double sig1, double sig2)
 
 void Pair::compute_dummy(int eflag, int vflag)
 {
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = 0;
+  ev_init(eflag,vflag);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1619,7 +1623,7 @@ void Pair::write_file(int narg, char **arg)
   eamfp[0] = eamfp[1] = 0.0;
   double *eamfp_hold;
 
-  Pair *epair = force->pair_match("eam",0);
+  Pair *epair = force->pair_match("^eam",0);
   if (epair) epair->swap_eam(eamfp,&eamfp_hold);
 
   // if atom style defines charge, swap in dummy q vec
@@ -1695,7 +1699,7 @@ void Pair::init_bitmap(double inner, double outer, int ntablebits,
   if (sizeof(int) != sizeof(float))
     error->all(FLERR,"Bitmapped lookup tables require int/float be same size");
 
-  if (ntablebits > sizeof(float)*CHAR_BIT)
+  if (ntablebits > (int)sizeof(float)*CHAR_BIT)
     error->all(FLERR,"Too many total bits for bitmapped lookup table");
 
   if (inner >= outer)
@@ -1719,7 +1723,7 @@ void Pair::init_bitmap(double inner, double outer, int ntablebits,
 
   int nmantbits = ntablebits - nexpbits;
 
-  if (nexpbits > sizeof(float)*CHAR_BIT - FLT_MANT_DIG)
+  if (nexpbits > (int)sizeof(float)*CHAR_BIT - FLT_MANT_DIG)
     error->all(FLERR,"Too many exponent bits for lookup table");
   if (nmantbits+1 > FLT_MANT_DIG)
     error->all(FLERR,"Too many mantissa bits for lookup table");
@@ -1738,6 +1742,18 @@ void Pair::init_bitmap(double inner, double outer, int ntablebits,
   masklo = rsq_lookup.i & ~(nmask);
 }
 
+/* ---------------------------------------------------------------------- */
+
+void Pair::hessian_twobody(double fforce, double dfac, double delr[3], double phiTensor[6]) {
+  int m = 0;
+  for (int k=0; k<3; k++) {
+    phiTensor[m] = fforce;
+    for (int l=k; l<3; l++) {
+      if (l>k) phiTensor[m] = 0;
+      phiTensor[m++] += delr[k]*delr[l] * dfac;
+    }
+  }
+}
 /* ---------------------------------------------------------------------- */
 
 double Pair::memory_usage()

@@ -15,11 +15,10 @@
    Contributing Author: Julien Devemy (ICCF)
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "pair_nm_cut_coul_cut.h"
+#include <mpi.h>
+#include <cmath>
+#include <cstring>
 #include "atom.h"
 #include "comm.h"
 #include "force.h"
@@ -74,8 +73,7 @@ void PairNMCutCoulCut::compute(int eflag, int vflag)
   int *ilist,*jlist,*numneigh,**firstneigh;
 
   evdwl = ecoul = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   double **x = atom->x;
   double **f = atom->f;
@@ -324,14 +322,6 @@ double PairNMCutCoulCut::init_one(int i, int j)
     }
     MPI_Allreduce(count,all,2,MPI_DOUBLE,MPI_SUM,world);
 
-    double rr1 = mm[i][j]*(nn[i][j]-1)*pow(r0[i][j],nn[i][j]);
-    double rr2 = nn[i][j]*(mm[i][j]-1)*pow(r0[i][j],mm[i][j]);
-    double p1 = 1-nn[i][j];
-    double p2 = 1-mm[i][j];
-
-    double rrr1 = pow(r0[i][j],nn[i][j])*(1-nn[i][j]);
-    double rrr2 = pow(r0[i][j],mm[i][j])*(1-mm[i][j]);
-
     double cut_lj3 = cut_lj[i][j]*cut_lj[i][j]*cut_lj[i][j];
     ptail_ij = 2.*MY_PI/3.*all[0]*all[1]*e0nm[i][j]*nm[i][j]*cut_lj3 *
       (pow(r0[i][j]/cut_lj[i][j],nn[i][j])/(nn[i][j]-3) - pow(r0[i][j]/cut_lj[i][j],mm[i][j])/(mm[i][j]-3));
@@ -496,9 +486,8 @@ double PairNMCutCoulCut::single(int i, int j, int itype, int jtype,
 
 void *PairNMCutCoulCut::extract(const char *str, int &dim)
 {
-  dim = 0;
-  if (strcmp(str,"cut_coul") == 0) return (void *) &cut_coul;
   dim = 2;
+  if (strcmp(str,"cut_coul") == 0) return (void *) &cut_coul;
   if (strcmp(str,"e0") == 0) return (void *) e0;
   if (strcmp(str,"r0") == 0) return (void *) r0;
   if (strcmp(str,"nn") == 0) return (void *) nn;

@@ -14,20 +14,16 @@
    Contributing author: Oliver Henrich (University of Strathclyde, Glasgow)
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "pair_oxdna2_coaxstk.h"
+#include <mpi.h>
+#include <cmath>
+#include <cstring>
 #include "mf_oxdna.h"
 #include "atom.h"
 #include "comm.h"
 #include "force.h"
 #include "neighbor.h"
 #include "neigh_list.h"
-#include "neigh_request.h"
-#include "update.h"
-#include "integrate.h"
 #include "math_const.h"
 #include "memory.h"
 #include "error.h"
@@ -62,6 +58,7 @@ PairOxdna2Coaxstk::~PairOxdna2Coaxstk()
     memory->destroy(cut_cxst_hi);
     memory->destroy(cut_cxst_lc);
     memory->destroy(cut_cxst_hc);
+    memory->destroy(cutsq_cxst_hc);
     memory->destroy(b_cxst_lo);
     memory->destroy(b_cxst_hi);
 
@@ -103,9 +100,9 @@ PairOxdna2Coaxstk::~PairOxdna2Coaxstk()
 void PairOxdna2Coaxstk::compute(int eflag, int vflag)
 {
 
-  double delf[3],delt[3],delta[3],deltb[3]; // force, torque increment;
+  double delf[3],delta[3],deltb[3]; // force, torque increment;
   double evdwl,fpair,finc,tpair,factor_lj;
-  double v1tmp[3],v2tmp[3],v3tmp[3];
+  double v1tmp[3];
   double delr_ss[3],delr_ss_norm[3],rsq_ss,r_ss,rinv_ss;
   double delr_st[3],delr_st_norm[3],rsq_st,r_st,rinv_st;
   double theta1,theta1p,t1dir[3],cost1;
@@ -113,12 +110,6 @@ void PairOxdna2Coaxstk::compute(int eflag, int vflag)
   double theta5,theta5p,t5dir[3],cost5;
   double theta6,theta6p,t6dir[3],cost6;
   double cosphi3;
-
-  double gamma,gammacub,rinv_ss_cub,fac;
-  double aybx,azbx,rax,ray,raz,rbx;
-  double dcdr,dcdrbx;
-  double dcdaxbx,dcdaybx,dcdazbx;
-  double dcdrax,dcdray,dcdraz;
 
   // distances COM-backbone site, COM-stacking site
   double d_cs=-0.4, d_cst=+0.34;
@@ -149,8 +140,7 @@ void PairOxdna2Coaxstk::compute(int eflag, int vflag)
   double df2,df4f6t1,df4t4,df4t5,df4t6,rsint;
 
   evdwl = 0.0;
-  if (eflag || vflag) ev_setup(eflag,vflag);
-  else evflag = vflag_fdotr = 0;
+  ev_init(eflag,vflag);
 
   anum = list->inum;
   alist = list->ilist;
@@ -389,7 +379,11 @@ void PairOxdna2Coaxstk::compute(int eflag, int vflag)
       }
 
       // increment energy and virial
-      if (evflag) ev_tally(a,b,nlocal,newton_pair,evdwl,0.0,fpair,delr_st[0],delr_st[1],delr_st[2]);
+      // NOTE: The virial is calculated on the 'molecular' basis.
+      // (see G. Ciccotti and J.P. Ryckaert, Comp. Phys. Rep. 4, 345-392 (1986))
+
+      if (evflag) ev_tally_xyz(a,b,nlocal,newton_pair,evdwl,0.0,
+          delf[0],delf[1],delf[2],x[a][0]-x[b][0],x[a][1]-x[b][1],x[a][2]-x[b][2]);
 
       // pure torques not expressible as r x f
 

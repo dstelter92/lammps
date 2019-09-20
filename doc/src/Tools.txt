@@ -76,8 +76,10 @@ Post-processing tools :h3
 "pymol_asphere"_#pymol,
 "python"_#pythontools,
 "reax"_#reax_tool,
+"replica"_#replica,
 "smd"_#smd,
-"xmgrace"_#xmgrace :tb(c=6,ea=c,a=l)
+"spin"_#spin,
+"xmgrace"_#xmgrace :tb(c=6,ea=c,a=l) 
 
 Miscellaneous tools :h3
 
@@ -163,7 +165,7 @@ for the "chain benchmark"_Speed_bench.html.
 
 colvars tools :h4,link(colvars)
 
-The colvars directory contains a collection of tools for postprocessing
+The colvars directory contains a collection of tools for post-processing
 data produced by the colvars collective variable library.
 To compile the tools, edit the makefile for your system and run "make".
 
@@ -263,7 +265,7 @@ These tools were provided by Andres Jaramillo-Botero at CalTech
 
 emacs tool :h4,link(emacs)
 
-The tools/emacs directory contains an Emacs Lisp add-on file for GNU Emacs 
+The tools/emacs directory contains an Emacs Lisp add-on file for GNU Emacs
 that enables a lammps-mode for editing input scripts when using GNU Emacs,
 with various highlighting options set up.
 
@@ -391,30 +393,31 @@ definition file.  This tool was used to create the system for the
 
 moltemplate tool :h4,link(moltemplate)
 
-The moltemplate sub-directory contains a Python-based tool for
-building molecular systems based on a text-file description, and
-creating LAMMPS data files that encode their molecular topology as
-lists of bonds, angles, dihedrals, etc.  See the README.TXT file for
-more information.
+The moltemplate sub-directory contains instructions for installing
+moltemplate, a Python-based tool for building molecular systems based
+on a text-file description, and creating LAMMPS data files that encode
+their molecular topology as lists of bonds, angles, dihedrals, etc.
+See the README.txt file for more information.
 
 This tool was written by Andrew Jewett (jewett.aij at gmail.com), who
 supports it.  It has its own WWW page at
 "http://moltemplate.org"_http://moltemplate.org.
+The latest sources can be found "on its GitHub page"_https://github.com/jewettaij/moltemplate/releases
 
 :line
 
 msi2lmp tool :h4,link(msi)
 
 The msi2lmp sub-directory contains a tool for creating LAMMPS template
-input and data files from BIOVIA's Materias Studio files (formerly Accelrys'
-Insight MD code, formerly MSI/Biosym and its Discover MD code).
+input and data files from BIOVIA's Materias Studio files (formerly
+Accelrys' Insight MD code, formerly MSI/Biosym and its Discover MD code).
 
 This tool was written by John Carpenter (Cray), Michael Peachey
 (Cray), and Steve Lustig (Dupont). Several people contributed changes
 to remove bugs and adapt its output to changes in LAMMPS.
 
 This tool has several known limitations and is no longer under active
-development, so there are no changes except for the occasional bugfix.
+development, so there are no changes except for the occasional bug fix.
 
 See the README file in the tools/msi2lmp folder for more information.
 
@@ -483,11 +486,26 @@ README for more info on Pizza.py and how to use these scripts.
 
 :line
 
+replica tool :h4,link(replica)
+
+The tools/replica directory contains the reorder_remd_traj python script which
+can be used to reorder the replica trajectories (resulting from the use of the 
+temper command) according to temperature. This will produce discontinuous
+trajectories with all frames at the same temperature in each trajectory.
+Additional options can be used to calculate the canonical configurational
+log-weight for each frame at each temperature using the pymbar package. See
+the README.md file for further details. Try out the peptide example provided.
+
+This tool was written by (and is maintained by) Tanmoy Sanyal, 
+while at the Shell lab at UC Santa Barbara. (tanmoy dot 7989 at gmail.com) 
+
+:line
+
 reax tool :h4,link(reax_tool)
 
-The reax sub-directory contains stand-alond codes that can
-post-process the output of the "fix reax/bonds"_fix_reax_bonds.html
-command from a LAMMPS simulation using "ReaxFF"_pair_reax.html.  See
+The reax sub-directory contains stand-alone codes that can
+post-process the output of the "fix reax/c/bonds"_fix_reaxc_bonds.html
+command from a LAMMPS simulation using "ReaxFF"_pair_reaxc.html.  See
 the README.txt file for more info.
 
 These tools were written by Aidan Thompson at Sandia.
@@ -507,6 +525,20 @@ See the header of dump2vtk.cpp for more details.
 This tool was written by the USER-SMD package author, Georg
 Ganzenmuller at the Fraunhofer-Institute for High-Speed Dynamics,
 Ernst Mach Institute in Germany (georg.ganzenmueller at emi.fhg.de).
+
+:line
+
+spin tool :h4,link(spin)
+
+The spin sub-directory contains a C file interpolate.c which can
+be compiled and used to perform a cubic polynomial interpolation of
+the MEP following a GNEB calculation.
+
+See the README file in tools/spin/interpolate_gneb for more details.
+
+This tool was written by the SPIN package author, Julien
+Tranchida at Sandia National Labs (jtranch at sandia.gov, and by Aleksei
+Ivanov, at University of Iceland (ali5 at hi.is).
 
 :line
 
@@ -533,3 +565,4 @@ simulation.
 See the README file for details.
 
 These files were provided by Vikas Varshney (vv0210 at gmail.com)
+

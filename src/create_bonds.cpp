@@ -15,9 +15,9 @@
    Contributing authors: Mike Salerno (NRL) added single methods
 ------------------------------------------------------------------------- */
 
-#include <cstdlib>
-#include <cstring>
 #include "create_bonds.h"
+#include <mpi.h>
+#include <cstring>
 #include "atom.h"
 #include "domain.h"
 #include "force.h"
@@ -54,7 +54,7 @@ void CreateBonds::command(int narg, char **arg)
 
   int style;
 
-  int iarg;
+  int iarg = 0;
   if (strcmp(arg[0],"many") == 0) {
     style = MANY;
     if (narg != 6) error->all(FLERR,"Illegal create_bonds command");
